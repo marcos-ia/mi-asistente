@@ -1,29 +1,52 @@
 import os
 
+import requests
 from flask import Flask, request, Response
 from twilio.twiml.messaging_response import MessagingResponse
-import google.generativeai as genai
 
 
 app = Flask(__name__)
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
-model = genai.GenerativeModel(
-    os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
-    system_instruction=(
-        "Responde mensajes de WhatsApp de forma natural, clara y breve en español. "
-        "Responde como un asistente personal útil."
-    ),
-)
+def crear_respuesta(mensaje):
+    clave = os.environ["GEMINI_API_KEY"]
+    modelo = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{modelo}:generateContent?key={clave}"
+    )
+
+    instrucciones = (
+        "Eres un asistente personal. Responde al siguiente WhatsApp "
+        "de forma natural, clara, breve y útil en español. "
+        "No digas que eres una inteligencia artificial. "
+        "Mensaje recibido: "
+    )
+
+    datos = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": instrucciones + mensaje
+                    }
+                ]
+            }
+        ]
+    }
+
+    respuesta = requests.post(url, json=datos, timeout=30)
+    respuesta.raise_for_status()
+
+    contenido = respuesta.json()
+    return contenido["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
 @app.post("/whatsapp")
 def whatsapp():
     mensaje = request.form.get("Body", "")
-
-    resultado = model.generate_content(mensaje)
-    respuesta = resultado.text.strip()
+    respuesta = crear_respuesta(mensaje)
 
     twiml = MessagingResponse()
     twiml.message(respuesta)
@@ -35,6 +58,12 @@ def whatsapp():
 def inicio():
     return "Asistente de WhatsApp funcionando"
 
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)
+    )
 
 if __name__ == "__main__":
     app.run(
