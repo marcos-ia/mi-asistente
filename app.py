@@ -1,40 +1,46 @@
-<!doctype html>
-<html lang="en">
-    <head>
-      <script type="text/javascript">window.__APP__ = {"build":{"version":"20260915-115330"}};</script>
+import os
 
-        <meta charset="UTF-8" />
-        <link href="/_enter_web/favicon.ico?v=20260903" rel="icon" type="image/x-icon" />
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
-        />
-        <meta name="robots" content="noindex, nofollow" />
-        <script>
-            (function () {
-                try {
-                    var storedTheme = window.localStorage.getItem('enter-theme');
-                    var resolvedTheme =
-                        storedTheme === 'light' || storedTheme === 'dark'
-                            ? storedTheme
-                            : window.matchMedia('(prefers-color-scheme: dark)').matches
-                              ? 'dark'
-                              : 'light';
+from flask import Flask, request, Response
+from twilio.twiml.messaging_response import MessagingResponse
+import google.generativeai as genai
 
-                    document.documentElement.classList.remove('light', 'dark');
-                    document.documentElement.classList.add('theme-zinc', resolvedTheme);
-                } catch (error) {
-                    document.documentElement.classList.add('theme-zinc', 'dark');
-                }
-            })();
-        </script>
-        <style id="enter-static-bootstrap-loading-style">
-            /* 首帧 Loading 与正式 PageLoading（enter-brand-page-loading）保持同一门形、
-               流动动画、文案排版与居中几何；漂移由 static-bootstrap-loading.test.ts 守卫。 */
-            @property --enter-static-brand-door-phase {
-                syntax: '<length>';
-                inherits: false;
-                initial-value: -32px;
+
+app = Flask(__name__)
+
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+
+model = genai.GenerativeModel(
+    os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
+    system_instruction=(
+        "Responde mensajes de WhatsApp de forma natural, clara y breve en español. "
+        "Responde como un asistente personal útil."
+    ),
+)
+
+
+@app.post("/whatsapp")
+def whatsapp():
+    mensaje = request.form.get("Body", "")
+
+    resultado = model.generate_content(mensaje)
+    respuesta = resultado.text.strip()
+
+    twiml = MessagingResponse()
+    twiml.message(respuesta)
+
+    return Response(str(twiml), mimetype="application/xml")
+
+
+@app.get("/")
+def inicio():
+    return "Asistente de WhatsApp funcionando"
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+    )                initial-value: -32px;
             }
 
             html,
